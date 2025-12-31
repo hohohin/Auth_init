@@ -1,0 +1,6 @@
+fastapi[standard]
+sqlmodel
+passlib[argon2]
+python-jose[cryptography]
+python-multipart
+uvicorn

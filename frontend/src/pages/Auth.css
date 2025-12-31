@@ -1,0 +1,83 @@
+/* src/pages/Auth.css */
+
+/* 使用 Grid 将卡片完美居中 */
+.auth-container {
+  display: grid;
+  place-items: center; /* 即 align-items: center; justify-items: center; */
+  min-height: 100vh;
+  padding: 20px;
+}
+
+/* 白色的表单卡片 */
+.auth-card {
+  background-color: var(--color-white);
+  padding: 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  max-width: 400px; /* 限制最大宽度 */
+  text-align: center;
+}
+
+.auth-title {
+  color: var(--color-primary-blue);
+  margin-bottom: 1.5rem;
+  font-size: 2rem;
+}
+
+/* 表单元素布局 */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem; /* 输入框之间的间距 */
+}
+
+.form-group {
+  text-align: left;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--color-text-dark);
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.8rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.3s;
+}
+
+/* 输入框聚焦时变蓝 */
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-primary-blue);
+}
+
+/* 提交按钮：蓝色底，橙色Hover */
+.submit-btn {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  border: none;
+  border-radius: 8px;
+  background-color: var(--color-primary-blue);
+  color: var(--color-white);
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.submit-btn:hover {
+  background-color: var(--color-accent-orange);
+}
+
+/* 底部跳转链接 */
+.auth-switch {
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+}
