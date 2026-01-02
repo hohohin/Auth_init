@@ -1,20 +1,23 @@
 // src/components/ProtectedRoute.tsx
 import React from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAuth } from '../contexts/UserContext';
 
-const ProtectedRoute = () => {
-  const { isAuthenticated } = useAuth();
-  const location = useLocation();
+const ProtectedRoute: React.FC = () => {
+  const { user, isLoading } = useAuth();
 
-  if (!isAuthenticated) {
-    // 没登录？踢回登录页
-    // replace: 替换当前历史记录，防止用户点“后退”又回到这里
-    // state: 记录用户本来想去哪，登录后可以跳回来 (可选优化)
-    return <Navigate to="/login" replace state={{ from: location }} />;
+  // 1. 如果还在检查 Token，显示加载动画 (防止页面闪烁)
+  if (isLoading) {
+    return <div>正在登录...</div>;
   }
 
-  // 已登录？放行，渲染子路由 (Outlet)
+  // 2. 如果检查完了发现没登录，强制跳转到登录页
+  // replace 属性的意思是：替换当前历史记录，这样用户点击“后退”按钮时不会又回到这个受保护页面
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // 3. 如果登录了，渲染子路由
   return <Outlet />;
 };
 

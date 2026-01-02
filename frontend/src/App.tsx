@@ -1,38 +1,46 @@
 // src/App.tsx
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext'; // 1. 引入 Provider
-import ProtectedRoute from './components/ProtectedRoute'; // 2. 引入守卫
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { UserProvider } from './contexts/UserContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import AppLayout from './components/AppLayout';
+
+// 引入你的页面组件
 import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
+import Dashboard from './pages/Dashboard'; // 假设你有这个页面
+// import Settings from './pages/Settings'; 
 
-function App() {
+const App: React.FC = () => {
   return (
-    // 3. 用 AuthProvider 包裹最外层，让所有页面都能读取登录状态
-    <AuthProvider>
-      <Router>
+    <BrowserRouter>
+      {/* UserProvider 必须在 BrowserRouter 里面或者外面包裹住 Routes，只要能覆盖到就行 */}
+      <UserProvider>
         <Routes>
-          {/* 公开路由 */}
+          {/* === 公开路由 === */}
+          {/* 谁都可以访问登录页 */}
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
 
-          {/* === 受保护路由区域 === */}
-          {/* 所有包裹在 ProtectedRoute 里面的路由，都需要登录才能看 */}
+          {/* === 受保护路由 (重点在这里) === */}
+          {/* 所有在 ProtectedRoute 下面的子路由，都会先经过那个“守门员”的检查 */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            {/* 未来可以在这里加更多受保护页面，比如 /video/:id */}
+            <Route element={<AppLayout />}>
+              
+              {/* 👇 这些页面现在都会显示在 Layout 的 Outlet 那个坑位里 */}
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/settings" element={<div>这里是设置页面</div>} />
+              
+              {/* 根路径重定向 */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              
+            </Route>
           </Route>
 
-          {/* 默认路由：重定向 */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          
-          {/* 404 也可以重定向回 dashboard */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          {/* 404 处理 */}
+          <Route path="*" element={<div>页面不存在</div>} />
         </Routes>
-      </Router>
-    </AuthProvider>
+      </UserProvider>
+    </BrowserRouter>
   );
-}
+};
 
 export default App;

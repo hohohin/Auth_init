@@ -1,94 +1,95 @@
 // src/pages/Login.tsx
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios'; // 确保 npm install axios
-import { useAuth } from '../context/AuthContext'; // 引入我们写的 Hook
-import './Auth.css';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/UserContext'; // 👈 引入 Hook
 
-const Login = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+const Login: React.FC = () => {
+  // 从 Context 中拿到 login 方法
+  // 注意：不需要 user 状态，因为如果 user 存在，App.tsx 根本不会渲染这个组件
+  const { login, user } = useAuth(); 
+  const navigate = useNavigate();    // 👈 拿到跳转工具
+
+  // 🛡️ 新增：如果用户已经登录，自动跳转到 dashboard
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
   
-  const { login } = useAuth(); // 获取 login 方法
-  const navigate = useNavigate();
+  const [agentCode, setAgentCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsLoading(true);
+    setError(null);
+    setIsSubmitting(true);
 
     try {
-      // 1. 准备 OAuth2 表单数据
-      const params = new URLSearchParams();
-      params.append('username', username);
-      params.append('password', password);
-
-      // 2. 调用后端接口 (假设后端在 8000 端口)
-      const response = await axios.post('http://127.0.0.1:8000/token', params, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-      });
-
-      // 3. 拿到 Token
-      const { access_token } = response.data;
+      // ✅ 关键点：直接调用 Context 的 login
+      // 这里的逻辑是：如果报错，代码会进 catch；如果不报错，说明登录成功。
+      // 登录成功后，Context 里的 user 状态会变，App.tsx 会自动重新渲染并切到主页。
+      await login({ agent_code: agentCode, password });
       
-      // 4. 存入 Context 并跳转
-      login(access_token);
-      navigate('/dashboard');
-
-    } catch (err: any) {
-      console.error(err);
-      setError('登录失败：用户名或密码错误');
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      console.error('登录出错:', err);
+      // 这里可以根据 axios 的 error.response.status 来细分错误
+      setError('登录失败，请检查工号和密码');
+      setIsSubmitting(false); // 只有失败时才需要恢复按钮，成功了组件就销毁了
     }
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <h2 className="auth-title">欢迎回来</h2>
-        
-        {/* 错误提示 */}
-        {error && <div style={{ color: 'var(--color-alert-red)', marginBottom: '1rem' }}>{error}</div>}
+    <div style={{ maxWidth: '400px', margin: '100px auto', padding: '30px', border: '1px solid #ddd', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
+      <h2 style={{ textAlign: 'center' }}>系统登录</h2>
+      
+      {error && (
+        <div style={{ background: '#ffe6e6', color: '#d00', padding: '10px', marginBottom: '15px', borderRadius: '4px' }}>
+          {error}
+        </div>
+      )}
+      
+      <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', marginBottom: '5px' }}>工号 (Agent Code):</label>
+          <input 
+            type="text" 
+            value={agentCode}
+            onChange={(e) => setAgentCode(e.target.value)}
+            required 
+            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+          />
+        </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="username">用户名</label>
-            <input
-              type="text"
-              id="username"
-              className="form-input"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="password">密码</label>
-            <input
-              type="password"
-              id="password"
-              className="form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          <button 
-            type="submit" 
-            className="submit-btn" 
-            disabled={isLoading}
-            style={{ opacity: isLoading ? 0.7 : 1 }}
-          >
-            {isLoading ? '登录中...' : '登 录'}
-          </button>
-        </form>
-        <p className="auth-switch">
-          还没有账号？ <Link to="/register">立即注册</Link>
-        </p>
-      </div>
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', marginBottom: '5px' }}>密码:</label>
+          <input 
+            type="password" 
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required 
+            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        <button 
+          type="submit" 
+          disabled={isSubmitting} 
+          style={{ 
+            width: '100%', 
+            padding: '10px', 
+            backgroundColor: isSubmitting ? '#ccc' : '#1890ff', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px', 
+            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            fontSize: '16px'
+          }}
+        >
+          {isSubmitting ? '登录中...' : '立即登录'}
+        </button>
+      </form>
     </div>
   );
 };

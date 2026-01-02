@@ -1,12 +1,13 @@
 from datetime import timedelta
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware  # <--- 1. 导入这个
 from sqlmodel import Session, select
 
 # 导入自定义模块
 from database import create_db_and_tables, get_session
-from models import User, UserCreate, Token
+from models import User
+from schemas import UserCreate, Token
 import auth
 
 app = FastAPI()
@@ -50,35 +51,44 @@ def register(user_in: UserCreate, session: Session = Depends(get_session)):
     return user
 
 # === 登录 (获取 Token) ===
-@app.post("/token", response_model=Token)
-async def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(), 
-    session: Session = Depends(get_session)
-):
-    # 1. 查用户
+@app.post("/login")
+def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
     user = session.exec(select(User).where(User.agent_code == form_data.username)).first()
     
-    # 2. 验证密码 (Argon2)
+    # 验证账号密码
     if not user or not auth.verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
     
-    # 3. 生成 Token
-    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = auth.create_access_token(
-        data={"sub": user.agent_code}, expires_delta=access_token_expires
+    # 生成 Token
+    access_token = auth.create_access_token(subject=user.agent_code)
+    
+    # 🌟 核心变化：设置 HttpOnly Cookie
+    response.set_cookie(
+        key="access_token",          # Cookie 的名字
+        value=access_token, # Cookie 的值
+        httponly=True,               # 关键！禁止 JS 读取 🛡️
+        max_age=1800,                # 过期时间 (秒)，这里设为 30 分钟
+        expires=1800,
+        samesite="lax",              # 防止 CSRF 的一种机制
+        secure=False,                # 开发环境设为 False，生产环境必须设为 True (仅 HTTPS)
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    
+    # 响应体里不再需要 token 了，返回个成功信息即可
+    return {"message": "Login successful"}
+
+@app.post("/logout")
+def logout(response: Response):
+    response.delete_cookie(key="access_token")      # 和上面的Cookie名字一样喔
+    return {"message": "Logout successful"}
 
 # === 受保护的接口 ===
 @app.get("/users/me", response_model=User)
 async def read_users_me(current_user: User = Depends(auth.get_current_user)):
     """
-    只要加了 Depends(auth.get_current_user)，
-    没有 Token 或 Token 过期都会自动被挡在外面
+    自动拦截 (Depends): 当请求到达这个接口时，FastAPI 会先暂停，转而去运行 get_current_user。
+    安全检查: 如果 Token 无效或过期，get_current_user 会直接抛出 HTTP 401 错误，read_users_me 根本不会被执行（保护了接口）。
+    数据传递: 如果验证通过，get_current_user 返回的那个 user 数据库对象，会直接赋值给参数 current_user。
+    直接返回: 我们只需要把这个拿到的用户对象直接 return 出去即可。
     """
     return current_user
 

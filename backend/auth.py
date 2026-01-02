@@ -1,12 +1,14 @@
 from datetime import datetime, timedelta
-from typing import Optional
-from fastapi import Depends, HTTPException, status
+from datetime import datetime, timedelta
+from typing import Union, Any
+from fastapi import Depends, HTTPException, status, Cookie
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlmodel import Session, select
 from database import get_session
-from models import User, TokenData
+from models import User
+from schemas import TokenData
 
 # === 配置 ===
 SECRET_KEY = "YOUR_SUPER_SECRET_KEY_CHANGE_THIS"
@@ -29,41 +31,39 @@ def get_password_hash(password):
     """生成 Argon2 哈希"""
     return pwd_context.hash(password)
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_access_token(subject: Union[str, Any], expires_delta: timedelta = None) -> str:
     """生成 JWT Token"""
-    to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.utcnow() + timedelta(minutes=30)
     
-    to_encode.update({"exp": expire})
+    to_encode = {"exp": expire, "sub": str(subject)}
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 # === 关键依赖注入 (Dependency) ===
-async def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Depends(get_session)):
-    """
-    解码 Token -> 拿到用户名 -> 查库 -> 返回 User 对象
-    如果 Token 无效或过期，直接抛出 401 错误
-    """
+async def get_current_user(access_token: str | None = Cookie(default=None), session: Session = Depends(get_session)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    # 1. 如果 Cookie 里根本没有 token，直接报错
+    if access_token is None:
+        raise credentials_exception
+
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        # 2. 解码 (直接解，不需要处理 Bearer 了)
+        payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
+        agent_code: str = payload.get("sub")
+        if agent_code is None:
             raise credentials_exception
-        token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception
         
-    statement = select(User).where(User.username == token_data.username)
-    user = session.exec(statement).first()
-    
+    # 3. 查库
+    user = session.exec(select(User).where(User.agent_code == agent_code)).first()
     if user is None:
         raise credentials_exception
         
